@@ -2,7 +2,6 @@
 class LogStash::Inputs::Jmx < LogStash::Inputs::Base
   # TODO add documentation
   config_name 'jmx'
-  milestone 1
 
   #Class Var
   attr_accessor :regexp_group_alias_object
