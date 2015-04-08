@@ -1,3 +1,8 @@
+# encoding: utf-8
+require "logstash/inputs/base"
+require "logstash/namespace"
+require "logstash/json"
+
 # Permits to retrieve metrics from jmx.
 class LogStash::Inputs::Jmx < LogStash::Inputs::Base
   # TODO add documentation
@@ -20,11 +25,9 @@ class LogStash::Inputs::Jmx < LogStash::Inputs::Base
   # Read and parse json conf
   private
   def read_conf(file_conf)
-    require 'json'
-
     @logger.debug("Parse json #{file_conf} to ruby data structure")
     json = File.read(file_conf)
-    JSON.parse(json)
+    LogStash::Json.load(json)
   end
 
   # Verify that all required parameter are present in the conf_hash
