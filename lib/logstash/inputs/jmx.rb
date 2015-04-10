@@ -3,20 +3,19 @@ require "logstash/inputs/base"
 require "logstash/namespace"
 require "logstash/json"
 
-# This input plugins permits to retrieve metrics from jmx.
-# It scan a folder, every <polling_frequency>, containing some
-# json configuration describing jvms to monitor with attributes to
-# retrieve.
+# This input plugin permits to retrieve metrics from remote Java applications using JMX.
+# Every `polling_frequency`, it scans a folder containing json configuration 
+# files describing JVMs to monitor with metrics to retrieve.
 # Then a pool of threads will retrieve metrics and create events.
 #
 # ## The configuration:
 #
-# On the logstash configuration you have to set the polling frequency,
-# the number of thread use to poll metrics and a path where are stored
-# json files containing the configuration per jvm of metrics to retrieve.
-# Logstash input config exemple:
-#
-#     jmx{
+# In Logstash configuration, you must set the polling frequency,
+# the number of thread used to poll metrics and a directory absolute path containing
+# json files with the configuration per jvm of metrics to retrieve.
+# Logstash input configuration example:
+# [source,ruby]
+#     jmx {
 #       //Required
 #       path => "/apps/logstash_conf/jmxconf"
 #       //Optional, default 60s
@@ -26,29 +25,29 @@ require "logstash/json"
 #       nb_thread => 4
 #     }
 #
-# json jmx config exemple:
-#
+# Json JMX configuration example:
+# [source,js]
 #     {
-#       //Require: jmx listening host/ip
+#       //Required, JMX listening host/ip
 #       "host" : "192.168.1.2",
-#       //Require jmx listening port
+#       //Required, JMX listening port
 #       "port" : 1335,
-#       //Optional the username to connect to jmx
+#       //Optional, the username to connect to JMX
 #       "username" : "user",
-#       //Optional the password to connect to jmx
+#       //Optional, the password to connect to JMX
 #       "password": "pass",
-#       //Optional, Used as the base of the metric name. If not set use <host>_<port>
+#       //Optional, use this alias as a prefix in the metric name. If not set use <host>_<port>
 #       "alias" : "test.homeserver.elasticsearch",
-#       //List of JMX metrics to retrieve
+#       //Required, list of JMX metrics to retrieve
 #       "queries" : [
 #       {
-#         //Required: The object name of Mbean to request
+#         //Required, the object name of Mbean to request
 #         "object_name" : "java.lang:type=Memory",
-#         //Optional: Use this alias in the metrics value instead of the object_name
+#         //Optional, use this alias in the metrics value instead of the object_name
 #         "object_alias" : "Memory"
 #       }, {
 #         "object_name" : "java.lang:type=Runtime",
-#         //Optional: Set of attributes to retrieve. If not set retrieve
+#         //Optional, set of attributes to retrieve. If not set retrieve
 #         //all metrics available on the configured object_name.
 #         "attributes" : [ "Uptime", "StartTime" ],
 #         "object_alias" : "Runtime"
@@ -65,10 +64,10 @@ require "logstash/json"
 #       } ]
 #     }
 #
-# Here is the output generated. Depending to the returned value
-# number/boolean or other it fullfill a metric_value_number or a
-# metric_value_string event field:
-#
+# Here are examples of generated events. When returned metrics value type is 
+# number/boolean it is stored in `metric_value_number` event field
+# otherwise it is stored in `metric_value_string` event field.
+# [source,ruby]
 #     {
 #       "@version" => "1",
 #       "@timestamp" => "2014-02-18T20:57:27.688Z",
@@ -79,6 +78,7 @@ require "logstash/json"
 #       "metric_value_number" => 2212
 #     }
 #
+# [source,ruby]
 #     {
 #       "@version" => "1",
 #       "@timestamp" => "2014-02-18T20:58:06.376Z",
