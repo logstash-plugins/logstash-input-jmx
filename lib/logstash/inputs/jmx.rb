@@ -106,73 +106,55 @@ class LogStash::Inputs::Jmx < LogStash::Inputs::Base
   # Indicate number of thread launched to retrieve metrics
   config :nb_thread, :validate => :number, :default => 4
 
-  # Read and parse json conf
-  private
-  def read_conf(file_conf)
-    @logger.debug("Parse json #{file_conf} to ruby data structure")
-    json = File.read(file_conf)
-    LogStash::Json.load(json)
-  end
-
+  #Error messages
+  MISSING_CONFIG_PARAMETER = "Missing parameter '%s'."
+  BAD_TYPE_CONFIG_PARAMETER = "Bad type for parameter '%{param}', expecting '%{expected}', found '%{actual}'."
+  MISSING_QUERY_PARAMETER = "Missing parameter '%s' in queries[%d]."
+  BAD_TYPE_QUERY = "Bad type for queries[%{index}], expecting '%{expected}', found '%{actual}'."
+  BAD_TYPE_QUERY_PARAMETER = "Bad type for parameter '%{param}' in queries[%{index}], expecting '%{expected}', found '%{actual}'."
   # Verify that all required parameter are present in the conf_hash
-  private
-  def check_conf(conf_hash,file_conf)
-    #Check required parameters
-    @logger.debug("Check that required parameters are define with good types in #{conf_hash}")
-    parameter = {'host' => 'String'.class, 'port' => 1.class, 'queries' => [].class}
-    parameter.each_key do |param|
-      if conf_hash.has_key?(param)
-        unless conf_hash[param].instance_of?(parameter[param])
-          @logger.error("Bad syntax for conf file #{file_conf}. Bad types for parameter #{param}, expecting #{parameter[param]}, found #{conf_hash[param].class}.")
-          return false
-        end
+  public
+  def validate_configuration(conf_hash)
+    validation_errors = []
+    #Check required parameters in configuration
+    ["host", "port","queries"].each do |param|
+      validation_errors << MISSING_CONFIG_PARAMETER % param unless conf_hash.has_key?(param)
+    end
+
+    #Validate parameters type in configuration
+    {"host" => String, "port" => Fixnum, "alias" => String }.each do |param, expected_type|
+      if conf_hash.has_key?(param) && !conf_hash[param].instance_of?(expected_type)
+        validation_errors << BAD_TYPE_CONFIG_PARAMETER % { :param => param, :expected => expected_type, :actual => conf_hash[param].class }
+      end
+    end
+
+    if conf_hash.has_key?("queries")
+      if !conf_hash["queries"].respond_to?(:each)
+        validation_errors << BAD_TYPE_CONFIG_PARAMETER % { :param => 'queries', :expected => Enumerable, :actual => conf_hash['queries'].class }
       else
-        @logger.error("Bad syntax for conf file #{file_conf}. Missing parameter #{param}.")
-        return false
-      end
-    end
-
-    @logger.debug('Check optional parameters types')
-    parameter = {'alias' => 'String'.class}
-    parameter.each_key do |param|
-      if conf_hash.has_key?(param)
-        unless conf_hash[param].instance_of?(parameter[param])
-          @logger.error("Bad syntax for conf file #{file_conf}. Bad types for parameter #{param}, expecting #{parameter[param]}, found #{conf_hash[param].class}.")
-          return false
-        end
-      end
-    end
-
-    @logger.debug('Check that required parameters are define with good types for queries')
-    parameter = {'object_name' => 'String'.class}
-    parameter.each_key do |param|
-      conf_hash['queries'].each do |query|
-        if query.has_key?(param)
-          unless query[param].instance_of?(parameter[param])
-            @logger.error("Bad syntax for conf file #{file_conf}. Bad types for parameter #{param} in query #{query}, expecting #{parameter[param]}, found #{conf_hash[param].class}.")
-            return false
+        conf_hash['queries'].each_with_index do |query,index|
+          unless query.respond_to?(:[]) && query.respond_to?(:has_key?)
+            validation_errors << BAD_TYPE_QUERY % {:index => index, :expected => Hash, :actual => query.class}
+            next
           end
-        else
-          @logger.error("Bad syntax for conf file #{file_conf} in query #{query}. Missing parameter #{param}.")
-          return false
-        end
-      end
-    end
+          #Check required parameters in each query
+          ["object_name"].each do |param|
+            validation_errors << MISSING_QUERY_PARAMETER % [param,index] unless query.has_key?(param)
+          end
+          #Validate parameters type in each query
+          {"object_name" => String, "object_alias" => String }.each do |param, expected_type|
+            if query.has_key?(param) && !query[param].instance_of?(expected_type)
+              validation_errors << BAD_TYPE_QUERY_PARAMETER % { :param => param, :index => index, :expected => expected_type, :actual => query[param].class }
+            end
+          end
 
-    @logger.debug('Check optional parameters types for queries')
-    parameter = {'object_alias' => 'String'.class, 'attributes' => [].class}
-    parameter.each_key do |param|
-      conf_hash['queries'].each do |query|
-        if query.has_key?(param)
-          unless query[param].instance_of?(parameter[param])
-            @logger.error("Bad syntax for conf file #{file_conf} in query #{query}. Bad types for parameter #{param}, expecting #{parameter[param]}, found #{conf_hash[param].class}.")
-            return false
+          if query.has_key?("attributes") && !query["attributes"].respond_to?(:each)
+            validation_errors << BAD_TYPE_QUERY_PARAMETER % { :param => 'attributes', :index => index, :expected => Enumerable, :actual => query['attributes'].class }
           end
         end
       end
     end
-
-    true
+    return validation_errors
   end
 
   private
@@ -215,8 +197,6 @@ class LogStash::Inputs::Jmx < LogStash::Inputs::Base
   # Thread function to retrieve metrics from JMX
   private
   def thread_jmx(queue_conf,queue)
-    require 'jmx4r'
-
     while true
       begin
         @logger.debug('Wait config to retrieve from queue conf')
@@ -317,43 +297,45 @@ class LogStash::Inputs::Jmx < LogStash::Inputs::Base
 
   public
   def register
-    @logger.info('Registering files in', :path => @path)
+    require 'thread'
+    require 'jmx4r'
 
-    @logger.info('Create queue conf used to send jmx conf to jmx collector threads')
+    @logger.info("Create queue dispatching JMX requests to threads")
     @queue_conf = Queue.new
 
-    @logger.info('Compile regexp for group alias object replacement')
+    @logger.info("Compile regexp for group alias object replacement")
     @regexp_group_alias_object = Regexp.new('(?:\${(.*?)})+')
   end
 
   public
   def run(queue)
-    require 'thread'
-
     begin
       threads = []
-      @logger.info("Init #{@nb_thread} jmx collector threads")
+      @logger.info("Initialize #{@nb_thread} threads for JMX metrics collection")
       @nb_thread.times do
         threads << Thread.new { thread_jmx(@queue_conf,queue) }
       end
 
       while true
-        @logger.info("Load conf files in #{@path}")
+        @logger.info("Loading configuration files in path", :path => @path)
         Dir.foreach(@path) do |item|
+          next if item == '.' or item == '..'
           begin
-            next if item == '.' or item == '..'
             file_conf = File.join(@path, item)
-            @logger.debug("Load conf file #{file_conf}")
-            conf_hash = read_conf(file_conf)
-            if check_conf(conf_hash,file_conf)
-              @logger.debug("Add conf #{conf_hash} to the queue conf")
+            @logger.debug? && @logger.debug("Loading configuration from file", :file => file_conf)
+            config_string = File.read(file_conf)
+            conf_hash = LogStash::Json.load(config_string)
+            validation_errors = validate_configuration(conf_hash)
+            if validation_errors.empty?
+              @logger.debug? && @logger.debug("Add configuration to the queue", :config => conf_hash)
               @queue_conf << conf_hash
+            else
+              @logger.warn("Issue with configuration file", :file => file_conf,
+              :validation_errors => validation_errors)
             end
           rescue Exception => ex
-            @logger.warn("Issue parsing file #{file_conf}")
-            @logger.warn(ex.message)
-            @logger.warn(ex.backtrace.join("\n"))
-            next
+            @logger.warn("Issue loading configuration from file", :file => file_conf,
+              :exception => ex.message, :backtrace => ex.backtrace)
           end
         end
         @logger.debug('Wait until the queue conf is empty')
