@@ -3,6 +3,7 @@ require "logstash/devutils/rspec/spec_helper"
 require "logstash/inputs/jmx"
 require "logstash/codecs/plain"
 require 'stud/temporary'
+require "jmx4r"
 
 describe LogStash::Inputs::Jmx do
 
@@ -77,6 +78,79 @@ describe LogStash::Inputs::Jmx do
         minimal_config["queries"] = [ { "object_name" => "1234", "attributes" => 1234} ]
         expect(subject.validate_configuration(minimal_config)).to eq([BAD_TYPE_QUERY_PARAMETER % {:param => "attributes", :index => 0, :expected => Enumerable, :actual => Fixnum} ])
       end
+    end
+  end
+
+  context "establish JMX connection" do
+    subject { LogStash::Inputs::Jmx.new("path" => jmx_config_path, "nb_thread" => 1, "polling_frequency" => 1)}
+
+    let(:queue) { Queue.new }
+    it "pass host/port connection parameters to jmx4r" do
+      File.open(File.join(jmx_config_path,"my.config.json"), "wb") { |file|  file.write(<<-EOT)
+      {
+        "host" : "localhost",
+        "port" : 1234,
+        "queries": []
+      }
+      EOT
+      }
+
+      expect(JMX::MBean).to receive(:connection).with({
+        :host => "localhost",
+        :port => 1234,
+        :url => nil
+      }).and_return(nil)
+
+      subject.register
+      Thread.new(subject) { sleep 0.5; subject.teardown } # force the plugin to exit
+      subject.run(queue)
+    end
+
+    it "pass custom url in addition of host/port connection parameters to jmx4r" do
+      File.open(File.join(jmx_config_path,"my.config.json"), "wb") { |file|  file.write(<<-EOT)
+      {
+        "host" : "localhost",
+        "port" : 1234,
+        "url" : "abcdefg",
+        "queries": []
+      }
+      EOT
+      }
+
+      expect(JMX::MBean).to receive(:connection).with({
+        :host => "localhost",
+        :port => 1234,
+        :url => "abcdefg"
+      }).and_return(nil)
+
+      subject.register
+      Thread.new(subject) { sleep 0.5; subject.teardown } # force the plugin to exit
+      subject.run(queue)
+    end
+
+    it "pass host/port username/password connection parameters to jmx4r" do
+      File.open(File.join(jmx_config_path,"my.config.json"), "wb") { |file|  file.write(<<-EOT)
+      {
+        "host" : "localhost",
+        "port" : 1234,
+        "username" : "me",
+        "password" : "secret",
+        "queries": []
+      }
+      EOT
+      }
+
+      expect(JMX::MBean).to receive(:connection).with({
+        :host => "localhost",
+        :port => 1234,
+        :url => nil,
+        :username => "me",
+        :password => "secret"
+      }).and_return(nil)
+
+      subject.register
+      Thread.new(subject) { sleep 0.5; subject.teardown } # force the plugin to exit
+      subject.run(queue)
     end
   end
 end
