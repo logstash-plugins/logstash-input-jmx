@@ -208,12 +208,14 @@ class LogStash::Inputs::Jmx < LogStash::Inputs::Base
           @logger.debug("Connect to #{thread_hash_conf['host']}:#{thread_hash_conf['port']} with user #{thread_hash_conf['username']}")
           jmx_connection = JMX::MBean.connection :host => thread_hash_conf['host'],
                                                  :port => thread_hash_conf['port'],
+                                                 :url => thread_hash_conf['url'],
                                                  :username => thread_hash_conf['username'],
                                                  :password => thread_hash_conf['password']
         else
           @logger.debug("Connect to #{thread_hash_conf['host']}:#{thread_hash_conf['port']}")
           jmx_connection = JMX::MBean.connection :host => thread_hash_conf['host'],
-                                                 :port => thread_hash_conf['port']
+                                                 :port => thread_hash_conf['port'],
+                                                 :url => thread_hash_conf['url']
         end
 
 
@@ -288,6 +290,8 @@ class LogStash::Inputs::Jmx < LogStash::Inputs::Base
           end
         end
         jmx_connection.close
+      rescue LogStash::ShutdownSignal
+        break #free
       rescue Exception => ex
         @logger.error(ex.message)
         @logger.error(ex.backtrace.join("\n"))
@@ -316,7 +320,7 @@ class LogStash::Inputs::Jmx < LogStash::Inputs::Base
         threads << Thread.new { thread_jmx(@queue_conf,queue) }
       end
 
-      while true
+      while !@interrupted
         @logger.info("Loading configuration files in path", :path => @path)
         Dir.foreach(@path) do |item|
           next if item == '.' or item == '..'
@@ -354,9 +358,21 @@ class LogStash::Inputs::Jmx < LogStash::Inputs::Base
                        \nYou must adapt nb_thread, retrieve_interval to the number of jvm/metrics you want to retrieve.")
         end
       end
+    rescue LogStash::ShutdownSignal
+        #exiting
     rescue Exception => ex
       @logger.error(ex.message)
       @logger.error(ex.backtrace.join("\n"))
+    ensure
+      threads.each do |thread|
+        thread.raise(LogStash::ShutdownSignal) if thread.alive?
+      end
     end
+
   end
+
+  public
+  def teardown
+    @interrupted = true
+  end # def teardown
 end
