@@ -191,6 +191,7 @@ class LogStash::Inputs::Jmx < LogStash::Inputs::Base
       event['metric_path'] = metric_path_substituted
       event['metric_value_string'] = metric_value.to_s
     end
+    decorate(event)
     queue << event
   end
 
