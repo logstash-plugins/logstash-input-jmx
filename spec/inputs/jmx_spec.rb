@@ -102,7 +102,7 @@ describe LogStash::Inputs::Jmx do
       }).and_return(nil)
 
       subject.register
-      Thread.new(subject) { sleep 0.5; subject.teardown } # force the plugin to exit
+      Thread.new(subject) { sleep 0.5; subject.close } # force the plugin to exit
       subject.run(queue)
     end
 
@@ -124,7 +124,7 @@ describe LogStash::Inputs::Jmx do
       }).and_return(nil)
 
       subject.register
-      Thread.new(subject) { sleep 0.5; subject.teardown } # force the plugin to exit
+      Thread.new(subject) { sleep 0.5; subject.close } # force the plugin to exit
       subject.run(queue)
     end
 
@@ -149,7 +149,7 @@ describe LogStash::Inputs::Jmx do
       }).and_return(nil)
 
       subject.register
-      Thread.new(subject) { sleep 0.5; subject.teardown } # force the plugin to exit
+      Thread.new(subject) { sleep 0.5; subject.close } # force the plugin to exit
       subject.run(queue)
     end
   end

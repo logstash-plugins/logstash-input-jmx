@@ -373,7 +373,7 @@ class LogStash::Inputs::Jmx < LogStash::Inputs::Base
   end
 
   public
-  def teardown
+  def close
     @interrupted = true
-  end # def teardown
+  end # def close
 end
