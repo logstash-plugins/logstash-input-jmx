@@ -373,6 +373,11 @@ class LogStash::Inputs::Jmx < LogStash::Inputs::Base
   end
 
   public
+  def stop
+    @interrupted = true
+  end # def stop
+
+  public
   def close
     @interrupted = true
   end # def close
