@@ -315,6 +315,8 @@ class LogStash::Inputs::Jmx < LogStash::Inputs::Base
   public
   def run(queue)
     begin
+      @run_thread = Thread.current
+
       threads = []
       @logger.info("Initialize #{@nb_thread} threads for JMX metrics collection")
       @nb_thread.times do
@@ -375,6 +377,7 @@ class LogStash::Inputs::Jmx < LogStash::Inputs::Base
   public
   def stop
     @interrupted = true
+    @run_thread.raise(LogStash::ShutdownSignal) if @run_thread.alive?
   end # def stop
 
   public
