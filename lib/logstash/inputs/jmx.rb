@@ -172,24 +172,24 @@ class LogStash::Inputs::Jmx < LogStash::Inputs::Base
   def send_event_to_queue(queue,host,metric_path,metric_value)
     @logger.debug('Send event to queue to be processed by filters/outputs')
     event = LogStash::Event.new
-    event['host'] = host
-    event['path'] = @path
-    event['type'] = @type
+    event('host', host)
+    event('path', @path)
+    event.set('type', @type)
     number_type = [Fixnum, Bignum, Float]
     boolean_type = [TrueClass, FalseClass]
     metric_path_substituted = metric_path.gsub(' ','_').gsub('"','')
     if number_type.include?(metric_value.class)
       @logger.debug("The value #{metric_value} is of type number: #{metric_value.class}")
-      event['metric_path'] = metric_path_substituted
-      event['metric_value_number'] = metric_value
+      event.set('metric_path', metric_path_substituted)
+      event.set('metric_value_number', metric_value)
     elsif boolean_type.include?(metric_value.class)
       @logger.debug("The value #{metric_value} is of type boolean: #{metric_value.class}")
-      event['metric_path'] = metric_path_substituted+'_bool'
-      event['metric_value_number'] = metric_value ? 1 : 0
+      event.set('metric_path', metric_path_substituted+'_bool')
+      event.set('metric_value_number', metric_value ? 1 : 0)
     else
       @logger.debug("The value #{metric_value} is not of type number: #{metric_value.class}")
-      event['metric_path'] = metric_path_substituted
-      event['metric_value_string'] = metric_value.to_s
+      event.set('metric_path', metric_path_substituted)
+      event.set('metric_value_string', metric_value.to_s)
     end
     decorate(event)
     queue << event
