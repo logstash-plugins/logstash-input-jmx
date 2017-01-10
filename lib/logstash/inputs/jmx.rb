@@ -172,8 +172,8 @@ class LogStash::Inputs::Jmx < LogStash::Inputs::Base
   def send_event_to_queue(queue,host,metric_path,metric_value)
     @logger.debug('Send event to queue to be processed by filters/outputs')
     event = LogStash::Event.new
-    event('host', host)
-    event('path', @path)
+    event.set('host', host)
+    event.set('path', @path)
     event.set('type', @type)
     number_type = [Fixnum, Bignum, Float]
     boolean_type = [TrueClass, FalseClass]
