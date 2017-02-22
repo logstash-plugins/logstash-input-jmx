@@ -189,7 +189,7 @@ class LogStash::Inputs::Jmx < LogStash::Inputs::Base
     else
       @logger.debug("The value #{metric_value} is not of type number: #{metric_value.class}")
       event.set('metric_path', metric_path_substituted)
-      if metric_value.java_object.class == Java::JavaArray
+      if metric_value.respond_to?(:java_object) && metric_value.java_object.class == Java::JavaArray
         event.set('metric_value_string', metric_value.to_a.to_s)
       else
         event.set('metric_value_string', metric_value.to_s)
