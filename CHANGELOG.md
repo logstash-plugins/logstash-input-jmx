@@ -1,3 +1,6 @@
+## 3.0.3
+  - Fix some documentation issues
+
 # 3.0.1
   - fix left-over usage of old event api, migrated to using `event#set`
 
