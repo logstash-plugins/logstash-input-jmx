@@ -29,10 +29,8 @@ describe LogStash::Inputs::Jmx do
         #Minimal configuration
         expect(subject.validate_configuration(minimal_config)).to eq([])
         # Re-test with java objects from JrJackson serialization
-        if LogStash::Environment.jruby?
-          require "java"
-          expect(subject.validate_configuration({"host"=>"localhost","port"=>1234,"queries" => java.util.ArrayList.new})).to eq([])
-        end
+        require "java"
+        expect(subject.validate_configuration({"host"=>"localhost","port"=>1234,"queries" => java.util.ArrayList.new})).to eq([])
       end
 
       it "return error message for missing mandatory parameters" do
