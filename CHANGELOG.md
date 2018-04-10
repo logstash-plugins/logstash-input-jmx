@@ -1,3 +1,6 @@
+## 3.0.5
+  - Fix documentation issue (correct subheading format)
+
 ## 3.0.4
   - Update gemspec summary
 
