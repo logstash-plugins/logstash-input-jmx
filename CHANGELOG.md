@@ -1,5 +1,8 @@
+## 3.0.6
+ - Fix documentation issue (correct subheading format)
+
 ## 3.0.5
-  - Docs: Set the default_codec doc attribute.
+ - Docs: Set the default_codec doc attribute.
 
 ## 3.0.4
   - Update gemspec summary
