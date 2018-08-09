@@ -1,3 +1,6 @@
+## 3.0.7
+ - Fixed shutdown handling [#47](https://github.com/logstash-plugins/logstash-input-jmx/pull/47)
+
 ## 3.0.6
  - Fix documentation issue (correct subheading format)
 
