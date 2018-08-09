@@ -12,6 +12,10 @@ describe LogStash::Inputs::Jmx do
     FileUtils.remove_dir(jmx_config_path)
   end
 
+  it_behaves_like "an interruptible input plugin" do
+    let(:config) {{"path" => jmx_config_path, "nb_thread" => 1, "polling_frequency" => 1}}
+  end
+
   subject { LogStash::Inputs::Jmx.new("path" => jmx_config_path)}
 
   context "#validate_configuration(conf_hash)" do
@@ -83,6 +87,7 @@ describe LogStash::Inputs::Jmx do
     subject { LogStash::Inputs::Jmx.new("path" => jmx_config_path, "nb_thread" => 1, "polling_frequency" => 1)}
 
     let(:queue) { Queue.new }
+
     it "pass host/port connection parameters to jmx4r" do
       File.open(File.join(jmx_config_path,"my.config.json"), "wb") { |file|  file.write(<<-EOT)
       {
@@ -100,7 +105,7 @@ describe LogStash::Inputs::Jmx do
       }).and_return(nil)
 
       subject.register
-      Thread.new(subject) { sleep 0.5; subject.close } # force the plugin to exit
+      Thread.new(subject) { sleep 0.5; subject.do_stop } # force the plugin to exit
       subject.run(queue)
     end
 
@@ -122,7 +127,7 @@ describe LogStash::Inputs::Jmx do
       }).and_return(nil)
 
       subject.register
-      Thread.new(subject) { sleep 0.5; subject.close } # force the plugin to exit
+      Thread.new(subject) { sleep 0.5; subject.do_stop } # force the plugin to exit
       subject.run(queue)
     end
 
@@ -147,7 +152,7 @@ describe LogStash::Inputs::Jmx do
       }).and_return(nil)
 
       subject.register
-      Thread.new(subject) { sleep 0.5; subject.close } # force the plugin to exit
+      Thread.new(subject) { sleep 0.5; subject.do_stop } # force the plugin to exit
       subject.run(queue)
     end
   end

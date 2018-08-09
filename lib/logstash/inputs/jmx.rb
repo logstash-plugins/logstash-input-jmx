@@ -202,7 +202,14 @@ class LogStash::Inputs::Jmx < LogStash::Inputs::Base
       begin
         @logger.debug('Wait config to retrieve from queue conf')
         thread_hash_conf = queue_conf.pop
-        @logger.debug("Retrieve config #{thread_hash_conf} from queue conf")
+
+        if thread_hash_conf == :END
+          # the :END symbol is a signal to terminate the thread
+          @logger.debug? && @logger.debug("Received jmx thread termination signal")
+          return
+        else
+          @logger.debug? && @logger.debug("Retrieve config #{thread_hash_conf} from queue conf")
+        end
 
         @logger.debug('Check if jmx connection need a user/password')
         if thread_hash_conf.has_key?('username') and thread_hash_conf.has_key?('password')
@@ -213,12 +220,16 @@ class LogStash::Inputs::Jmx < LogStash::Inputs::Base
                                                  :username => thread_hash_conf['username'],
                                                  :password => thread_hash_conf['password']
         else
-          @logger.debug("Connect to #{thread_hash_conf['host']}:#{thread_hash_conf['port']}")
+          @logger.debug("Connect to #{thread_hash_conf['host']}:#{thread_hash_conf['port']}:#{thread_hash_conf['url']}")
           jmx_connection = JMX::MBean.connection :host => thread_hash_conf['host'],
                                                  :port => thread_hash_conf['port'],
                                                  :url => thread_hash_conf['url']
         end
 
+        if jmx_connection.nil?
+          @logger.warn("Invalid nil jmx connection, ignoring", :host => thread_hash_conf['host'], :port => thread_hash_conf['port'],  :url => thread_hash_conf['url'])
+          next
+        end
 
         if thread_hash_conf.has_key?('alias')
           @logger.debug("Set base_metric_path to alias: #{thread_hash_conf['alias']}")
@@ -291,8 +302,6 @@ class LogStash::Inputs::Jmx < LogStash::Inputs::Base
           end
         end
         jmx_connection.close
-      rescue LogStash::ShutdownSignal
-        break #free
       rescue Exception => ex
         @logger.error(ex.message)
         @logger.error(ex.backtrace.join("\n"))
@@ -321,7 +330,7 @@ class LogStash::Inputs::Jmx < LogStash::Inputs::Base
         threads << Thread.new { thread_jmx(@queue_conf,queue) }
       end
 
-      while !@interrupted
+      while !stop?
         @logger.info("Loading configuration files in path", :path => @path)
         Dir.foreach(@path) do |item|
           next if item == '.' or item == '..'
@@ -343,6 +352,7 @@ class LogStash::Inputs::Jmx < LogStash::Inputs::Base
               :exception => ex.message, :backtrace => ex.backtrace)
           end
         end
+
         @logger.debug('Wait until the queue conf is empty')
         delta=0
         until @queue_conf.empty?
@@ -350,30 +360,25 @@ class LogStash::Inputs::Jmx < LogStash::Inputs::Base
           delta=delta+1
           sleep(1)
         end
+
         wait_time=@polling_frequency-delta
         if wait_time>0
           @logger.debug("Wait #{wait_time}s (#{@polling_frequency}-#{delta}(seconds wait until queue conf empty)) before to launch again a new jmx metrics collection")
-          sleep(wait_time)
+          Stud.stoppable_sleep(wait_time) { stop? }
         else
           @logger.warn("The time taken to retrieve metrics is more important than the retrieve_interval time set.
                        \nYou must adapt nb_thread, retrieve_interval to the number of jvm/metrics you want to retrieve.")
         end
       end
-    rescue LogStash::ShutdownSignal
-        #exiting
     rescue Exception => ex
       @logger.error(ex.message)
       @logger.error(ex.backtrace.join("\n"))
     ensure
-      threads.each do |thread|
-        thread.raise(LogStash::ShutdownSignal) if thread.alive?
+      @nb_thread.times do |i|
+        @logger.debug? && @logger.debug("Signaling termination to jmx thread #{i + 1}")
+        @queue_conf << :END
       end
+      threads.each {|t| t.join }
     end
-
   end
-
-  public
-  def close
-    @interrupted = true
-  end # def close
 end
