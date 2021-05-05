@@ -175,10 +175,15 @@ class LogStash::Inputs::Jmx < LogStash::Inputs::Base
     event.set('host', host)
     event.set('path', @path)
     event.set('type', @type)
-    number_type = [Fixnum, Bignum, Float]
+    number_type = [Fixnum, Bignum]
+    float_type = [Float]
     boolean_type = [TrueClass, FalseClass]
     metric_path_substituted = metric_path.gsub(' ','_').gsub('"','')
-    if number_type.include?(metric_value.class)
+    if float_type.include?(metric_value.class)
+      @logger.debug("The value #{metric_value} is of type float: #{metric_value.class}")
+      event.set('metric_path', metric_path_substituted)
+      event.set('metric_value_float', metric_value)
+    elsif number_type.include?(metric_value.class)
       @logger.debug("The value #{metric_value} is of type number: #{metric_value.class}")
       event.set('metric_path', metric_path_substituted)
       event.set('metric_value_number', metric_value)
