@@ -151,6 +151,11 @@ class LogStash::Inputs::Jmx < LogStash::Inputs::Base
           if query.has_key?("attributes") && !query["attributes"].respond_to?(:each)
             validation_errors << BAD_TYPE_QUERY_PARAMETER % { :param => 'attributes', :index => index, :expected => Enumerable, :actual => query['attributes'].class }
           end
+# operations          
+          if query.has_key?("operations") && !query["operations"].respond_to?(:each)
+            validation_errors << BAD_TYPE_QUERY_PARAMETER % { :param => 'operations', :index => index, :expected => Enumerable, :actual => query['operations'].class }
+          end  
+# end operations                  
         end
       end
     end
@@ -295,7 +300,31 @@ class LogStash::Inputs::Jmx < LogStash::Inputs::Base
                     @logger.warn(ex.message)
                   end
                 end
-              end
+              end              
+# operations              
+              if query.has_key?('operations')
+                @logger.debug("Retrieves operations #{query['operations']} to #{jmx_object_name.object_name}")
+                query['operations'].each do |operation|
+                  begin
+                    @logger.debug("operation: #{operation[0]} params: #{operation[1].join(', ')}")                    
+                    jmx_operation_value = jmx_object_name.send(operation[0], *operation[1])
+                    if jmx_operation_value.instance_of? Java::JavaxManagementOpenmbean::CompositeDataSupport
+                      @logger.debug('The jmx value is a composite_data one')
+                      jmx_operation_value.each do |jmx_operation_value_composite|
+                        @logger.debug("Get jmx value #{jmx_operation_value[jmx_operation_value_composite]} for operation #{operation}.#{jmx_operation_value_composite} to #{jmx_object_name.object_name}")
+                        send_event_to_queue(queue, thread_hash_conf['host'], "#{base_metric_path}.#{object_name}.#{operation}.#{jmx_operation_value_composite}", jmx_operation_value[jmx_operation_value_composite])
+                      end
+                    else
+                      @logger.debug("Get jmx value #{jmx_operation_value} for operation #{operation} to #{jmx_object_name.object_name}")
+                      send_event_to_queue(queue, thread_hash_conf['host'], "#{base_metric_path}.#{object_name}.#{operation}", jmx_operation_value)
+                    end
+                  rescue Exception => ex
+                    @logger.warn("Failed retrieving metrics for operation #{operation} on object #{jmx_object_name.object_name}")
+                    @logger.warn(ex.message)
+                  end
+                end
+              end                
+# end operations              
             end
           else
             @logger.warn("No jmx object found for #{query['object_name']}")
