@@ -24,7 +24,7 @@ require "logstash/json"
 #       //Optional, default 4
 #       nb_thread => 4
 #     }
-#
+#  ## NOTE :- path value should be  the Directory path(Not the file path) where jmxconf File Exists 
 # Json JMX configuration example:
 # [source,js]
 #     {
